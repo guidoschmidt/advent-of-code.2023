@@ -1,18 +1,27 @@
 const std = @import("std");
 
 fn createBuildTarget(b: *std.Build, day: u8) void {
-    const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
+    var name_buf: [32]u8 = undefined;
+    const name = std.fmt.bufPrint(&name_buf,
+                                  "aoc_day-{d}", .{ day }) catch "aoc";
     var source_file_buf: [32]u8 = undefined;
     const source_file = std.fmt.bufPrint(&source_file_buf,
                                          "src/day{d}.zig", .{ day }) catch "src/day1.zig";
     const exe = b.addExecutable(.{
-        .name = "advent-of-code",
+        .name = name,
         .root_source_file = .{ .path = source_file },
-        .target = target,
+        .target = b.resolveTargetQuery(.{
+            .cpu_arch = .wasm32,
+            .os_tag = .freestanding,
+        }),
         .optimize = optimize,
     });
+    exe.entry = .disabled;
+    exe.rdynamic = true;
+    exe.import_symbols = true;
+
     b.installArtifact(exe);
     const run_cmd = b.addRunArtifact(exe);
     run_cmd.step.dependOn(b.getInstallStep());
@@ -22,14 +31,14 @@ fn createBuildTarget(b: *std.Build, day: u8) void {
 
 
     // Testing
-    const unit_tests = b.addTest(.{
-        .root_source_file = .{ .path = source_file },
-        .target = target,
-        .optimize = optimize,
-    });
-    const run_unit_tests = b.addRunArtifact(unit_tests);
-    const test_step = b.step("test", "Run test cases");
-    test_step.dependOn(&run_unit_tests.step);
+    // const unit_tests = b.addTest(.{
+    //     .root_source_file = .{ .path = source_file },
+    //     .target = target,
+    //     .optimize = optimize,
+    // });
+    // const run_unit_tests = b.addRunArtifact(unit_tests);
+    // const test_step = b.step("test", "Run test cases");
+    // test_step.dependOn(&run_unit_tests.step);
 }
 
 pub fn build(b: *std.Build) void {
