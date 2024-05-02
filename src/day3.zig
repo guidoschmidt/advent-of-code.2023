@@ -1,56 +1,56 @@
 const std = @import("std");
-// const common = @import("common.zig");
+const wasm = @import("./wasm.zig");
 
 const Allocator = std.mem.Allocator;
 
-var memory: [8192 * 8192 * 2]u8 = undefined;
-var fba = std.heap.FixedBufferAllocator.init(&memory);
-const allocator = fba.allocator();
+var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+const allocator = arena.allocator();
 
-// fn listToNumber(list: std.ArrayList(u8)) u32 {
-//     var number: u32 = 0;
-//     for(0..list.items.len) |i| {
-//         const exp = std.math.pow(u32, 10, @as(u32, @intCast(i)));
-//         number += list.items[list.items.len - 1 - i] * exp;
-//     }
-//     return number;
-// }
 
-// fn expand(data: *[]u8, x: i16, y: i16, x_off: i16, y_off: i16, column_count: i16) !u32 {
-//     var left_numbers = std.ArrayList(u8).init(allocator);
-//     var right_numbers = std.ArrayList(u8).init(allocator);
-//     defer right_numbers.deinit();
-//     defer left_numbers.deinit();
+fn listToNumber(list: std.ArrayList(u8)) u32 {
+    var number: u32 = 0;
+    for(0..list.items.len) |i| {
+        const exp = std.math.pow(u32, 10, @as(u32, @intCast(i)));
+        number += list.items[list.items.len - 1 - i] * exp;
+    }
+    return number;
+}
 
-//     for(1..3) |o| {
-//         const idx_off_l = indexWithOffset(x, y, column_count, x_off - @as(i16, @intCast(o)), y_off, data.len);
-//         const char = data.*[@intCast(idx_off_l)];
-//         const found_digit = std.fmt.charToDigit(char, 10) catch {
-//             break;
-//         };
-//         try left_numbers.append(found_digit);
-//     }
-//     for(0..3) |o| {
-//         const idx_off_r = indexWithOffset(x, y, column_count, x_off + @as(i16, @intCast(o)), y_off, data.len);
-//         const char = data.*[@intCast(idx_off_r)];
-//         const found_digit = std.fmt.charToDigit(char, 10) catch {
-//             break;
-//         };
-//         try right_numbers.append(found_digit);
-//     }
-//     std.mem.reverse(u8, left_numbers.items);
-//     try left_numbers.appendSlice(right_numbers.items[0..]);
-//     const number = listToNumber(left_numbers);
-//     return number;
-// }
+fn expand(data: *[]u8, x: i16, y: i16, x_off: i16, y_off: i16, column_count: i16) !u32 {
+    var left_numbers = std.ArrayList(u8).init(allocator);
+    var right_numbers = std.ArrayList(u8).init(allocator);
+    defer right_numbers.deinit();
+    defer left_numbers.deinit();
 
-// fn indexWithOffset(x: i16, y: i16, col_count: i16, x_o: i16, y_o: i16, data_len: usize) usize {
-//     const idx = (y + y_o) * col_count + (x + x_o);
-//     return @min(@max(idx, 0), data_len);
-// }
+    for(1..3) |o| {
+        const idx_off_l = indexWithOffset(x, y, column_count, x_off - @as(i16, @intCast(o)), y_off, data.len);
+        const char = data.*[@intCast(idx_off_l)];
+        const found_digit = std.fmt.charToDigit(char, 10) catch {
+            break;
+        };
+        try left_numbers.append(found_digit);
+    }
+    for(0..3) |o| {
+        const idx_off_r = indexWithOffset(x, y, column_count, x_off + @as(i16, @intCast(o)), y_off, data.len);
+        const char = data.*[@intCast(idx_off_r)];
+        const found_digit = std.fmt.charToDigit(char, 10) catch {
+            break;
+        };
+        try right_numbers.append(found_digit);
+    }
+    std.mem.reverse(u8, left_numbers.items);
+    try left_numbers.appendSlice(right_numbers.items[0..]);
+    const number = listToNumber(left_numbers);
+    return number;
+}
 
-fn part1(input: []const u8) anyerror!void {
-    logStr(input.ptr, input.len);
+fn indexWithOffset(x: i16, y: i16, col_count: i16, x_o: i16, y_o: i16, data_len: usize) usize {
+    const idx = (y + y_o) * col_count + (x + x_o);
+    return @min(@max(idx, 0), data_len);
+}
+
+fn part1(input: []const u8) anyerror!u32 {
+    wasm.logStr(input.ptr, input.len);
 
     const clean_input = allocator.alloc(u8, input.len) catch input; 
     _ = std.mem.replace(u8, input, "\n", "", @constCast(clean_input));
@@ -120,111 +120,98 @@ fn part1(input: []const u8) anyerror!void {
         }
     }
 
-   logU32(sum);
-    // std.debug.print("\n\nResult: {d}", .{ sum });
+    wasm.logU32(sum);
+    return sum;
 }
 
-// fn part2(input: []const u8) anyerror!void {
-//     var clean_data: []u8 = try allocator.alloc(u8, input.len);
-//     _ = std.mem.replace(u8, input, "\n", "", clean_data);
+fn part2(input: []const u8) anyerror!u32 {
+    var clean_data: []u8 = try allocator.alloc(u8, input.len);
+    _ = std.mem.replace(u8, input, "\n", "", clean_data);
 
-//     var row_it = std.mem.tokenize(u8, input, "\n");
-//     const first_row = row_it.next().?;
+    var row_it = std.mem.tokenize(u8, input, "\n");
+    const first_row = row_it.next().?;
 
-//     const col_count = first_row.len;
-//     const row_count = row_it.buffer.len / col_count;
+    const col_count = first_row.len;
+    const row_count = row_it.buffer.len / col_count;
 
-//     std.debug.print("\nSize: {d} x {d}\n{d}", .{ col_count, row_count, input.len });
+    // std.debug.print("\nSize: {d} x {d}\n{d}", .{ col_count, row_count, input.len });
 
-//     var result: u32 = 0;
+    var result: u32 = 0;
 
-//     for(0..col_count) |x| {
-//         for(0..row_count) |y| {
-//             const idx =  y * col_count + x;
-//             const char = clean_data[idx];
-//             if (char != '*') continue;
-//             std.debug.print("\n{c} [idx {d}] [{d} x {d}]", .{ char, idx, y, x });
+    for(0..col_count) |x| {
+        for(0..row_count) |y| {
+            const idx =  y * col_count + x;
+            const char = clean_data[idx];
+            if (char != '*') continue;
+            // std.debug.print("\n{c} [idx {d}] [{d} x {d}]", .{ char, idx, y, x });
 
-//             var part_num_count: u8 = 0;
-//             var gears = std.ArrayList(u32).init(allocator);
-//             defer gears.deinit();
-//             for(0..3) |xo| {
-//                 // if (part_num_count == 2) break;
-//                 for(0..3) |yo| {
-//                     const y_o: i16 = @as(i16, @intCast(yo)) - 1;
-//                     const x_o: i16 = @as(i16, @intCast(xo)) - 1;
-//                     if (x_o == 0 and y_o == 0) continue;
-//                     const idx_off = indexWithOffset(@intCast(x),
-//                                                     @intCast(y),
-//                                                     @intCast(col_count),
-//                                                     x_o,
-//                                                     y_o,
-//                                                     clean_data.len);
-//                     const char_around = clean_data[idx_off];
-//                     const digit = std.fmt.charToDigit(char_around, 10) catch {
-//                         continue;
-//                     };
-//                     _ = digit;
-//                     part_num_count += 1;
-//                     const number = try expand(allocator,
-//                                               &clean_data,
-//                                               @as(i16, @intCast(x)),
-//                                               @as(i16, @intCast(y)),
-//                                               x_o,
-//                                               y_o,
-//                                               @intCast(col_count));
-//                     var already_in = false;
-//                     for(gears.items) |item| {
-//                         if (item == number) already_in = true;
-//                     }
-//                     if (already_in) continue;
-//                     try gears.append(number);
-//                 }
-//             }
+            var part_num_count: u8 = 0;
+            var gears = std.ArrayList(u32).init(allocator);
+            defer gears.deinit();
+            for(0..3) |xo| {
+                // if (part_num_count == 2) break;
+                for(0..3) |yo| {
+                    const y_o: i16 = @as(i16, @intCast(yo)) - 1;
+                    const x_o: i16 = @as(i16, @intCast(xo)) - 1;
+                    if (x_o == 0 and y_o == 0) continue;
+                    const idx_off = indexWithOffset(@intCast(x),
+                                                    @intCast(y),
+                                                    @intCast(col_count),
+                                                    x_o,
+                                                    y_o,
+                                                    clean_data.len);
+                    const char_around = clean_data[idx_off];
+                    const digit = std.fmt.charToDigit(char_around, 10) catch {
+                        continue;
+                    };
+                    _ = digit;
+                    part_num_count += 1;
+                    const number = try expand(&clean_data,
+                                              @as(i16, @intCast(x)),
+                                              @as(i16, @intCast(y)),
+                                              x_o,
+                                              y_o,
+                                              @intCast(col_count));
+                    var already_in = false;
+                    for(gears.items) |item| {
+                        if (item == number) already_in = true;
+                    }
+                    if (already_in) continue;
+                    try gears.append(number);
+                }
+            }
 
-//             std.debug.print("\n  → {d} Gears: {any}", .{
-//                 part_num_count, gears.items
-//             });
-//             if (gears.items.len >= 2) {
-//                 result += gears.items[0] * gears.items[1];
-//             }
-//         }
-//     }
+            // std.debug.print("\n  → {d} Gears: {any}", .{
+            //     part_num_count, gears.items
+            // });
+            if (gears.items.len >= 2) {
+                result += gears.items[0] * gears.items[1];
+            }
+        }
+    }
 
-//     logU32(result);
-//     std.debug.print("\n\nResult: {d}", .{ result });
-// }
+    wasm.logU32(result);
+    return result;
+    // std.debug.print("\n\nResult: {d}", .{ result });
+}
 
-// export fn part1_wasm(input: [*:0]u8, input_len: usize) void {
-//     const zig_input = "Test\nTest\nTest";
-//     logStr(zig_input.ptr, zig_input.len);
-
-//     var inner_input: [:0]u8 = undefined;
-//     inner_input.ptr = input;
-//     inner_input.len = input_len;
-//     logStr(inner_input.ptr, inner_input.len);
-//     part1(zig_input) catch {
-//         return;
-//     };
-// }
-
-export fn part1_wasm(input: [*:0]u8, input_len: usize) void {
+export fn part1_wasm(input: [*:0]u8, input_len: usize) u32 {
+    defer arena.deinit();
     var internal_input: [:0]u8 = undefined;
     internal_input.ptr = input;
     internal_input.len = input_len;
-    part1(internal_input) catch {
+    return part1(internal_input) catch {
         @panic("Could not run part 1!");
     };
-    return;
 }
 
-pub extern "wasmapi" fn logU32(s: u32) void;
-pub extern "wasmapi" fn logUsize(s: usize) void;
-pub extern "wasmapi" fn logStr(s: [*]const u8, len: usize) void;
 
-export fn allocUint8(length: u32) [*]const u8 {
-    const slice = std.heap.page_allocator.alloc(u8, length) catch {
-        @panic("failed to allocate memory");
+export fn part2_wasm(input: [*:0]u8, input_len: usize) u32 {
+    defer arena.deinit();
+    var internal_input: [:0]u8 = undefined;
+    internal_input.ptr = input;
+    internal_input.len = input_len;
+    return part2(internal_input) catch {
+        @panic("Could not run part 1!");
     };
-    return slice.ptr;
 }

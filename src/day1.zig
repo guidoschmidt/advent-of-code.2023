@@ -1,14 +1,10 @@
 const std = @import("std");
+const wasm = @import("./wasm.zig");
 
-// one
-// two
-// three
-// four
-// five
-// six
-// seven
-// eight
-// nine
+const Allocator = std.mem.Allocator;
+
+var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+const allocator = arena.allocator();
 
 fn strToDigit(s: []const u8) u8 {
     const words = [_][]const u8{
@@ -16,25 +12,56 @@ fn strToDigit(s: []const u8) u8 {
     };
     for(words, 1..) |word, i| {
         if (std.mem.eql(u8, word, s)) {
-            std.debug.print("\n>>> {s}", .{ s });
             return @intCast(i);
         }
     }
     return 0;
 }
 
-pub fn main() !void {
-    const data = @embedFile("./data/day1.txt");
+fn part1(input: []const u8) anyerror!u32 {
     var result: u32 = 0;
 
-    var it = std.mem.tokenize(u8, data, "\n");
+    var it = std.mem.tokenize(u8, input, "\n");
     while(it.next()) |v| {
-        // std.debug.print("\n{s}", .{ v });
         var number: u32 = 0;
         var first: u8 = 0;
         var last: u8 = 0;
 
-        std.debug.print("\n\n{s}", .{ v });
+        for(0..v.len) |x| {
+            const digit = std.fmt.charToDigit(v[x], 10) catch continue;
+            if (first == 0) {
+                first = digit;
+                break;
+            }
+        }
+
+        for(0..v.len) |x| {
+            const digit = std.fmt.charToDigit(v[v.len - 1 - x], 10) catch 0;
+            if (digit != 0) {
+                last = digit;
+                break;
+            }
+        }
+
+        number = 10 * first;
+        number += last;
+
+        result += number;
+    }
+
+    wasm.logU32(result);
+    return result;
+}
+
+fn part2(input: []const u8) anyerror!u32 {
+    var result: u32 = 0;
+
+    var it = std.mem.tokenize(u8, input, "\n");
+    while(it.next()) |v| {
+        var number: u32 = 0;
+        var first: u8 = 0;
+        var last: u8 = 0;
+
         for(0..v.len) |x| {
             if (v.len >= 3 and x < v.len - 3) {
                 const word = v[x..x + 3];
@@ -60,15 +87,12 @@ pub fn main() !void {
                     break;
                 }
             }
-            const digit = std.fmt.charToDigit(v[x], 10) catch {
-                continue;
-            };
+            const digit = std.fmt.charToDigit(v[x], 10) catch continue;
             if (first == 0) {
                 first = digit;
                 break;
             }
         }
-        std.debug.print("\n[FIRST]: {d}", .{ first });
 
         for(0..v.len) |x| {
             var digit = std.fmt.charToDigit(v[v.len - 1 - x], 10) catch 0;
@@ -76,12 +100,10 @@ pub fn main() !void {
                 last = digit;
                 break;
             }
-
             const end = v.len - x;
             if (v.len >= 3 and x < v.len - 3) {
                 const start = end - 3;
                 const word = v[start..end];
-                std.debug.print("\n...{s}", .{ word });
                 digit = strToDigit(word);
                 if (digit != 0) {
                     last = digit;
@@ -107,17 +129,33 @@ pub fn main() !void {
                 }
             }
         }
-        std.debug.print("\n[LAST]: {d}", .{ last });
-
-        // std.debug.print("\n{s} ", .{ v });
-        // std.debug.print(" → [first, last] [{d}, {d}], ", .{ first, last });
 
         number = 10 * first;
         number += last;
-        // std.debug.print(" → [{d}]", .{ number });
 
         result += number;
     }
 
-    std.debug.print("\nResult: {d}", .{ result });
+    wasm.logU32(result);
+    return result;
+}
+
+export fn part1_wasm(input: [*:0]u8, input_len: usize) u32 {
+    defer arena.deinit();
+    var internal_input: [:0]u8 = undefined;
+    internal_input.ptr = input;
+    internal_input.len = input_len;
+    return part1(internal_input) catch {
+        @panic("Could not run part 1!");
+    };
+}
+
+export fn part2_wasm(input: [*:0]u8, input_len: usize) u32 {
+    defer arena.deinit();
+    var internal_input: [:0]u8 = undefined;
+    internal_input.ptr = input;
+    internal_input.len = input_len;
+    return part2(internal_input) catch {
+        @panic("Could not run part 1!");
+    };
 }
