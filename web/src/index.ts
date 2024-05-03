@@ -1,40 +1,46 @@
-import WASM_URL from "./wasm/aoc_day-1.wasm?url";
+import {} from "@thi.ng/rstream";
+import { $compile, $list } from "@thi.ng/rdom";
+import { reactive } from "@thi.ng/rstream";
+import { range } from "@thi.ng/transducers";
+import { TestClass } from "./TestClass";
+import { runWasmModule } from "./wasm-interop";
 
-(async () => {
-  const textDecoder = new TextDecoder();
-  const textEncoder = new TextEncoder();
-  let memory = undefined;
-
-  const imports = {
-    wasmapi: {
-      logUsize: (x) => console.log(x),
-      logU32: (x) => console.log(x),
-      logStr: (addr, len) => {
-        const str = textDecoder.decode(
-          new Uint8Array(memory.buffer, addr, len),
-        );
-        console.log(str);
+$compile([
+  "div",
+  {},
+  ["h1", {}, "Advent of Code 2023"],
+  ["h2", {}, "zig + wasm"],
+  $list(reactive([...range(1, 25)]), "div", {}, (x) => [
+    "button",
+    {
+      onclick: () => {
+        runWasmModule(x);
       },
     },
-  };
-  const { instance } = await WebAssembly.instantiateStreaming(
-    fetch(WASM_URL),
-    imports,
-  );
-  console.log(instance);
-  const { allocUint8, part1_wasm, part2_wasm } = instance.exports;
-  memory = instance.exports.memory;
+    x,
+  ]),
+]).mount(document.body);
 
-  const fetchInputRes = await fetch("./day1.txt");
-  let fetchInput = await fetchInputRes.text();
-  fetchInput = fetchInput.replaceAll("\r\n", "\n");
+globalThis.getPatchedTouchpoint = () => ({ width: 2, height: 2 });
 
-  const inputBuffer = textEncoder.encode(fetchInput);
-  const inputPtr = allocUint8(inputBuffer.length + 1);
-  const slice = new Uint8Array(memory.buffer, inputPtr, inputBuffer.length + 1);
-  slice.set(inputBuffer);
-  slice[inputBuffer.length] = 0; // null byte to null-terminate the string
+const origInit = TestClass.prototype.init;
+TestClass.prototype.init = () => {
+  const patched = origInit
+    .toString()
+    .split("\n")
+    .map((line) => {
+      if (line.includes("getTouchpoint")) {
+        line = line.replace(
+          "getTouchpoint()",
+          "globalThis.getPatchedTouchpoint()",
+        );
+      }
+      return line;
+    })
+    .slice(1, -1)
+    .join("\n");
+  const f = new Function(patched);
+  f();
+};
 
-  const result_part1 = part1_wasm(inputPtr, inputBuffer.length + 1);
-  const result_part2 = part2_wasm(inputPtr, inputBuffer.length + 1);
-})();
+new TestClass();
